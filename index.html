@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fitness Tracker - Лесен и Красив</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+    margin: 0;
+    min-height: 100vh;
+    color: #2c3e50;
+  }
+  nav {
+    background: #34495e;
+    padding: 1rem 2rem;
+    color: #ecf0f1;
+    font-weight: 600;
+    font-size: 1.5rem;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  main {
+    max-width: 900px;
+    margin: 2rem auto 4rem;
+    padding: 0 1rem;
+    background: rgba(255,255,255,0.95);
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+  }
+
+  h1 {
+    font-weight: 700;
+    text-align: center;
+    color: #34495e;
+    margin-bottom: 1.8rem;
+  }
+
+  .flex {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  form {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(52, 73, 94, 0.1);
+    padding: 1.8rem 2rem;
+    flex: 1 1 380px;
+    min-width: 300px;
+    transition: box-shadow 0.3s ease;
+  }
+  form:hover {
+    box-shadow: 0 8px 30px rgba(52, 73, 94, 0.2);
+  }
+  form h2 {
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #74ebd5;
+    padding-bottom: 0.4rem;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    color: #34495e;
+  }
+
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  select {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 1.2rem;
+    border: 2px solid #bdc3c7;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+  }
+  input[type="text"]:focus,
+  input[type="date"]:focus,
+  input[type="number"]:focus,
+  select:focus {
+    border-color: #74ebd5;
+    outline: none;
+    box-shadow: 0 0 8px #74ebd5;
+  }
+
+  button {
+    background: #34495e;
+    color: white;
+    font-weight: 700;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    width: 100%;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background: #2c3e50;
+  }
+
+  /* Списък с тренировки и упражнения */
+  #workoutsListContainer {
+    margin-top: 3rem;
+  }
+
+  .workout-card {
+    background: #ecf0f1;
+    border-radius: 15px;
+    margin-bottom: 1.8rem;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.07);
+    position: relative;
+    transition: transform 0.2s ease;
+  }
+  .workout-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .workout-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .workout-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #2c3e50;
+  }
+  .workout-info {
+    font-weight: 500;
+    color: #34495e;
+    font-size: 0.95rem;
+  }
+  .btn-delete {
+    background: #e74c3c;
+    border: none;
+    color: white;
+    padding: 0.5rem 1.1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 12px rgba(231,76,60,0.4);
+    transition: background-color 0.3s ease;
+  }
+  .btn-delete:hover {
+    background: #c0392b;
+  }
+
+  ul.exercises-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  ul.exercises-list li {
+    background: white;
+    margin-bottom: 0.8rem;
+    border-radius: 8px;
+    padding: 0.9rem 1.2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+    font-weight: 600;
+    font-size: 1rem;
+    color: #2c3e50;
+  }
+  .btn-delete-ex {
+    background: #e67e22;
+    border: none;
+    color: white;
+    padding: 0.3rem 0.7rem;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.9rem;
+    box-shadow: 0 3px 10px rgba(230,126,34,0.4);
+    transition: background-color 0.3s ease;
+  }
+  .btn-delete-ex:hover {
+    background: #d35400;
+  }
+
+  /* Изчисти всички */
+  #clearAllBtn {
+    display: block;
+    margin: 2rem auto 3rem;
+    background: #e67e22;
+    padding: 0.85rem 2rem;
+    border-radius: 14px;
+    font-weight: 700;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1.15rem;
+    box-shadow: 0 5px 15px rgba(230,126,34,0.5);
+    transition: background-color 0.3s ease;
+    max-width: 300px;
+  }
+  #clearAllBtn:hover {
+    background: #d35400;
+  }
+
+  /* Мобилна версия */
+  @media (max-width: 620px) {
+    .flex {
+      flex-direction: column;
+    }
+    form {
+      min-width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+<nav>Fitness Tracker</nav>
+
+<main>
+  <h1>Лесен и Красив Fitness Tracker</h1>
+
+  <div class="flex">
+    <form id="workoutForm">
+      <h2>Добави тренировка</h2>
+      <label for="date">Дата:</label>
+      <input type="date" id="date" required />
+
+      <label for="workout_type">Вид тренировка:</label>
+      <input type="text" id="workout_type" placeholder="Например: Бягане" required />
+
+      <label for="duration">Продължителност (мин):</label>
+      <input type="number" id="duration" min="1" placeholder="Минутите" required />
+
+      <button type="submit">Добави тренировка</button>
+    </form>
+
+    <form id="exerciseForm">
+      <h2>Добави упражнение към тренировка</h2>
+      <label for="selectWorkout">Избери тренировка:</label>
+      <select id="selectWorkout" required>
+        <option value="" disabled selected>-- Избери тренировка --</option>
+      </select>
+
+      <label for="exercise_name">Име упражнение:</label>
+      <input type="text" id="exercise_name" placeholder="Например: Клекове" required />
+
+      <label for="reps">Брой повторения:</label>
+      <input type="number" id="reps" min="1" placeholder="Брой повторения" required />
+
+      <label for="sets">Брой серии:</label>
+      <input type="number" id="sets" min="1" placeholder="Брой серии" required />
+
+      <button type="submit">Добави упражнение</button>
+    </form>
+  </div>
+
+  <button id="clearAllBtn" title="Изчисти всички тренировки и упражнения">Изчисти всички данни</button>
+
+  <section id="workoutsListContainer" aria-live="polite" aria-label="Списък с тренировки и упражнения">
+    <!-- Тренировките и упражненията ще се покажат тук -->
+  </section>
+</main>
+
+<script>
+  // Уникален ID генератор
+  function generateId() {
+    return Date.now() + Math.floor(Math.random() * 1000);
+  }
+
+  // Зареждане на тренировки
+  function getWorkouts() {
+    return JSON.parse(localStorage.getItem('workouts') || '[]');
+  }
+
+  // Запис на тренировки
+  function saveWorkouts(workouts) {
+    localStorage.setItem('workouts', JSON.stringify(workouts));
+  }
+
+  // Актуализиране на dropdown менюто с тренировките
+  function updateWorkoutSelect() {
+    const workouts = getWorkouts();
+    const select = document.getElementById('selectWorkout');
+    select.innerHTML = '<option value="" disabled selected>-- Избери тренировка --</option>';
+    if (workouts.length === 0) {
+      const option = document.createElement('option');
+      option.text = 'Няма добавени тренировки';
+      option.disabled = true;
+      select.add(option);
+      select.disabled = true;
+    } else {
+      workouts.forEach(w => {
+        const option = document.createElement('option');
+        option.value = w.id;
+        option.text = `${w.date} | ${w.workout_type} (${w.duration_minutes} мин)`;
+        select.add(option);
+      });
+      select.disabled = false;
+    }
+  }
+
+  // Показване на всички тренировки и упражнения
+  function loadWorkouts() {
+    const container = document.getElementById('workoutsListContainer');
+    const workouts = getWorkouts();
+    container.innerHTML = '';
+
+    if (workouts.length === 0) {
+      container.innerHTML = `<p style="text-align:center; font-style:italic; color:#7f8c8d; font-size:1.1rem;">Все още няма добавени тренировки.</p>`;
+      updateWorkoutSelect();
+      return;
+    }
+
+    workouts.forEach(w => {
+      const card = document.createElement('article');
+      card.className = 'workout-card';
+
+      const header = document.createElement('div');
+      header.className = 'workout-header';
+
+      const title = document.createElement('div');
+      title.className = 'workout-title';
+      title.textContent = `${w.date} | ${w.workout_type}`;
+
+      const info = document.createElement('div');
+      info.className = 'workout-info';
+      info.textContent = `Продължителност: ${w.duration_minutes} мин`;
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-delete';
+      delBtn.textContent = 'Изтрий тренировка';
+      delBtn.title = 'Изтрий тази тренировка';
+      delBtn.addEventListener('click', () => {
+        if(confirm('Сигурни ли сте, че искате да изтриете тази тренировка?')) {
+          deleteWorkout(w.id);
+        }
+      });
+
+      header.append(title, info, delBtn);
+      card.appendChild(header);
+
+      // Упражнения
+      const exercisesList = document.createElement('ul');
+      exercisesList.className = 'exercises-list';
+
+      if (!w.exercises || w.exercises.length === 0) {
+        const noEx = document.createElement('li');
+        noEx.style.fontStyle = 'italic';
+        noEx.style.color = '#95a5a6';
+        noEx.textContent = 'Няма добавени упражнения.';
+        exercisesList.appendChild(noEx);
+      } else {
+        w.exercises.forEach(ex => {
+          const li = document.createElement('li');
+          li.textContent = `${ex.name} — ${ex.reps} повторения x ${ex.sets} серии`;
+
+          const delExBtn = document.createElement('button');
+          delExBtn.className = 'btn-delete-ex';
+          delExBtn.title = 'Изтрий упражнение';
+          delExBtn.textContent = '✖';
+          delExBtn.addEventListener('click', () => {
+            if(confirm('Сигурни ли сте, че искате да изтриете това упражнение?')) {
+              deleteExercise(w.id, ex.id);
+            }
+          });
+
+          li.appendChild(delExBtn);
+          exercisesList.appendChild(li);
+        });
+      }
+      card.appendChild(exercisesList);
+
+      container.appendChild(card);
+    });
+
+    updateWorkoutSelect();
+  }
+
+  // Изтриване на тренировка
+  function deleteWorkout(id) {
+    let workouts = getWorkouts();
+    workouts = workouts.filter(w => w.id !== id);
+    saveWorkouts(workouts);
+    loadWorkouts();
+  }
+
+  // Изтриване на упражнение
+  function deleteExercise(workoutId, exerciseId) {
+    let workouts = getWorkouts();
+    const workout = workouts.find(w => w.id === workoutId);
+    if (!workout) return;
+
+    workout.exercises = workout.exercises.filter(ex => ex.id !== exerciseId);
+    saveWorkouts(workouts);
+    loadWorkouts();
+  }
+
+  // Добавяне на тренировка
+  document.getElementById('workoutForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const date = e.target.date.value;
+    const workout_type = e.target.workout_type.value.trim();
+    const duration = parseInt(e.target.duration.value, 10);
+
+    if (!date || !workout_type || !duration || duration < 1) {
+      alert('Моля, попълнете всички полета правилно!');
+      return;
+    }
+
+    const workouts = getWorkouts();
+    const newWorkout = {
+      id: generateId(),
+      date,
+      workout_type,
+      duration_minutes: duration,
+      exercises: []
+    };
+
+    workouts.push(newWorkout);
+    saveWorkouts(workouts);
+
+    alert('Тренировката е добавена успешно!');
+    e.target.reset();
+    loadWorkouts();
+  });
+
+  // Добавяне на упражнение
+  document.getElementById('exerciseForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const workoutId = parseInt(e.target.selectWorkout.value, 10);
+    const exercise_name = e.target.exercise_name.value.trim();
+    const reps = parseInt(e.target.reps.value, 10);
+    const sets = parseInt(e.target.sets.value, 10);
+
+    if (!workoutId || !exercise_name || !reps || !sets || reps < 1 || sets < 1) {
+      alert('Моля, попълнете всички полета правилно!');
+      return;
+    }
+
+    const workouts = getWorkouts();
+    const workout = workouts.find(w => w.id === workoutId);
+
+    if (!workout) {
+      alert('Не е намерена тренировка с този избор!');
+      return;
+    }
+
+    const newExercise = {
+      id: generateId(),
+      name: exercise_name,
+      reps,
+      sets
+    };
+
+    workout.exercises.push(newExercise);
+    saveWorkouts(workouts);
+
+    alert('Упражнението е добавено успешно!');
+    e.target.reset();
+    loadWorkouts();
+  });
+
+  // Изчистване на всички данни
+  document.getElementById('clearAllBtn').addEventListener('click', () => {
+    if (confirm('Сигурни ли сте, че искате да изтриете всички тренировки и упражнения?')) {
+      localStorage.removeItem('workouts');
+      loadWorkouts();
+      alert('Всички данни са изчистени.');
+    }
+  });
+
+  // При стартиране зареждаме тренировките
+  loadWorkouts();
+</script>
+</body>
+</html>
