@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Разширен Fitness Tracker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.min.css" />
+</head>
+<body>
+  <!-- Основен HTML интерфейс с добавени: -->
+  <!-- - Филтри по дата и тип -->
+  <!-- - Платно за графика -->
+  <!-- - Експорт/импорт бутони -->
+  <!-- - Превключвател за тъмен/светъл режим -->
+  
+  <div style="text-align:center; padding:1rem">
+    <h1>Разширен Fitness Tracker</h1>
+    <label>Филтър по дата: <input type="date" id="filterDate"></label>
+    <label>Тип: <input type="text" id="filterType" placeholder="Напр. Бягане"></label>
+    <button onclick="applyFilters()">Филтрирай</button>
+    <button onclick="clearFilters()">Изчисти филтрите</button>
+    <br><br>
+    <canvas id="statsChart" width="400" height="200"></canvas>
+    <br>
+    <button onclick="exportData()">Експортирай данни</button>
+    <input type="file" accept=".json" onchange="importData(event)">
+    <br><br>
+    <button onclick="toggleTheme()">Превключи тема</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let darkMode = false;
+
+    function toggleTheme() {
+      darkMode = !darkMode;
+      document.body.style.backgroundColor = darkMode ? '#1e1e1e' : '#ffffff';
+      document.body.style.color = darkMode ? '#ffffff' : '#000000';
+    }
+
+    function applyFilters() {
+      const date = document.getElementById('filterDate').value;
+      const type = document.getElementById('filterType').value.trim().toLowerCase();
+      const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      const filtered = workouts.filter(w => {
+        return (!date || w.date === date) && (!type || w.workout_type.toLowerCase().includes(type));
+      });
+      updateChart(filtered);
+    }
+
+    function clearFilters() {
+      document.getElementById('filterDate').value = '';
+      document.getElementById('filterType').value = '';
+      updateChart(JSON.parse(localStorage.getItem('workouts') || '[]'));
+    }
+
+    function updateChart(data) {
+      const ctx = document.getElementById('statsChart').getContext('2d');
+      if (window.chartInstance) window.chartInstance.destroy();
+      window.chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(w => `${w.date}\n${w.workout_type}`),
+          datasets: [{
+            label: 'Продължителност (мин)',
+            data: data.map(w => w.duration_minutes),
+            backgroundColor: 'rgba(52, 152, 219, 0.6)',
+            borderColor: 'rgba(41, 128, 185, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    function exportData() {
+      const dataStr = JSON.stringify(localStorage.getItem('workouts') || '[]');
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'workouts.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const workouts = JSON.parse(e.target.result);
+          localStorage.setItem('workouts', workouts);
+          updateChart(JSON.parse(workouts));
+          alert('Данните са импортирани успешно.');
+        } catch (err) {
+          alert('Невалиден файл.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    updateChart(JSON.parse(localStorage.getItem('workouts') || '[]'));
+  </script>
+</body>
+</html>

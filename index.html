@@ -491,6 +491,1098 @@
 
   // При стартиране зареждаме тренировките
   loadWorkouts();
+
+  // --- Статистика ---
+  function showStats() {
+    const workouts = getWorkouts();
+    let totalMinutes = 0;
+    let exerciseCount = 0;
+    const exerciseMap = {};
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0,0,0,0);
+
+    workouts.forEach(w => {
+      const wDate = new Date(w.date);
+      if (wDate >= weekStart && wDate <= now) {
+        totalMinutes += w.duration_minutes;
+      }
+      if (w.exercises) {
+        exerciseCount += w.exercises.length;
+        w.exercises.forEach(ex => {
+          exerciseMap[ex.name] = (exerciseMap[ex.name] || 0) + 1;
+        });
+      }
+    });
+
+    let mostCommon = '-';
+    let max = 0;
+    for (const [name, count] of Object.entries(exerciseMap)) {
+      if (count > max) {
+        max = count;
+        mostCommon = name;
+      }
+    }
+
+    document.getElementById('statsContainer').innerHTML = `
+      <div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;">
+        <div><b>Общо време тази седмица:</b> ${totalMinutes} мин</div>
+        <div><b>Общо упражнения:</b> ${exerciseCount}</div>
+        <div><b>Най-често упражнение:</b> ${mostCommon}</div>
+      </div>
+    `;
+  }
+
+  // --- Календарен изглед ---
+  function showCalendar() {
+    const workouts = getWorkouts();
+    const calendar = document.getElementById('calendarContainer');
+    calendar.innerHTML = '';
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    // Създай таблица за календара
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    let html = `<table style="width:100%;border-collapse:collapse;text-align:center;">
+      <tr style="background:#ACB6E5;">
+        <th>П</th><th>В</th><th>С</th><th>Ч</th><th>П</th><th>Сб</th><th>Нд</th>
+      </tr><tr>
+    `;
+    let day = 1;
+    for (let i = 0; i < 7; i++) {
+      if (i < (firstDay === 0 ? 6 : firstDay-1)) html += '<td></td>';
+      else {
+        html += renderDayCell(day, month, year, workouts);
+        day++;
+      }
+    }
+    html += '</tr>';
+    while (day <= daysInMonth) {
+      html += '<tr>';
+      for (let i = 0; i < 7; i++) {
+        if (day > daysInMonth) html += '<td></td>';
+        else {
+          html += renderDayCell(day, month, year, workouts);
+          day++;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</table>';
+    calendar.innerHTML = html;
+  }
+
+  function renderDayCell(day, month, year, workouts) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const ws = workouts.filter(w => w.date === dateStr);
+    let cell = `<td style="border:1px solid #bdc3c7;min-width:60px;vertical-align:top;padding:2px 4px;${ws.length ? 'background:#74ebd5;' : ''}">`;
+    cell += `<div style="font-weight:bold;">${day}</div>`;
+    ws.forEach(w => {
+      cell += `<div style="font-size:0.85em;background:#fff;border-radius:6px;margin:2px 0;padding:2px 4px;">
+        ${w.workout_type}
+      </div>`;
+    });
+    cell += '</td>';
+    return cell;
+  }
+
+  // --- Теми (тъмна/светла) ---
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.body.style.background = 'linear-gradient(135deg, #232526 0%, #414345 100%)';
+      document.body.style.color = '#ecf0f1';
+      document.querySelector('main').style.background = 'rgba(44,62,80,0.97)';
+    } else {
+      document.body.style.background = 'linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%)';
+      document.body.style.color = '#2c3e50';
+      document.querySelector('main').style.background = 'rgba(255,255,255,0.95)';
+    }
+  }
+  document.getElementById('themeToggleBtn').addEventListener('click', () => {
+    const theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    setTheme(theme);
+  });
+  // При зареждане
+  setTheme(localStorage.getItem('theme') || 'light');
+
+  // --- Обнови статистика и календар при промяна ---
+  function updateAll() {
+    loadWorkouts();
+    showStats();
+    showCalendar();
+  }
+
+  // --- Редактиране на тренировка ---
+  function editWorkout(id) {
+    const workouts = getWorkouts();
+    const workout = workouts.find(w => w.id === id);
+    if (!workout) return;
+    // Покажи модален прозорец за редакция (basic prompt за пример)
+    const newType = prompt('Редактирай вид тренировка:', workout.workout_type);
+    if (newType === null) return;
+    const newDuration = prompt('Редактирай продължителност (мин):', workout.duration_minutes);
+    if (newDuration === null) return;
+    const newCategory = prompt('Редактирай категория:', workout.category || '');
+    const newTags = prompt('Редактирай тагове (разделени със запетая):', (workout.tags||[]).join(','));
+    const newNotes = prompt('Редактирай бележки:', workout.notes || '');
+    workout.workout_type = newType.trim();
+    workout.duration_minutes = parseInt(newDuration,10);
+    workout.category = newCategory ? newCategory.trim() : '';
+    workout.tags = newTags ? newTags.split(',').map(t=>t.trim()).filter(Boolean) : [];
+    workout.notes = newNotes ? newNotes.trim() : '';
+    // Калории
+    workout.calories = estimateCalories(workout.workout_type, workout.duration_minutes);
+    saveWorkouts(workouts);
+    updateAll();
+  }
+
+  // --- Редактиране на упражнение ---
+  function editExercise(workoutId, exerciseId) {
+    const workouts = getWorkouts();
+    const workout = workouts.find(w => w.id === workoutId);
+    if (!workout) return;
+    const ex = workout.exercises.find(e => e.id === exerciseId);
+    if (!ex) return;
+    const newName = prompt('Редактирай име на упражнение:', ex.name);
+    if (newName === null) return;
+    const newReps = prompt('Редактирай брой повторения:', ex.reps);
+    if (newReps === null) return;
+    const newSets = prompt('Редактирай брой серии:', ex.sets);
+    if (newSets === null) return;
+    ex.name = newName.trim();
+    ex.reps = parseInt(newReps,10);
+    ex.sets = parseInt(newSets,10);
+    saveWorkouts(workouts);
+    updateAll();
+  }
+
+  // --- Калории по тип тренировка (примерни стойности) ---
+  function estimateCalories(type, minutes) {
+    const map = {
+      'бягане': 10,
+      'кардио': 8,
+      'йога': 4,
+      'сила': 7,
+      'колоездене': 7,
+      'плуване': 9
+    };
+    let t = type.toLowerCase();
+    let perMin = 6;
+    for (const k in map) if (t.includes(k)) perMin = map[k];
+    return perMin * minutes;
+  }
+
+  // --- Добавяне на нови полета във формата за тренировка ---
+  // (категория, тагове, бележки, снимка)
+  // Добави в HTML:
+  // <label for="category">Категория:</label>
+  // <input type="text" id="category" placeholder="напр. Кардио, Сила" />
+  // <label for="tags">Тагове:</label>
+  // <input type="text" id="tags" placeholder="напр. крака, сутрин" />
+  // <label for="notes">Бележки:</label>
+  // <textarea id="notes" placeholder="Бележки към тренировката"></textarea>
+  // <label for="photo">Снимка:</label>
+  // <input type="file" id="photo" accept="image/*" />
+
+  // --- Промени submit обработчика за тренировка ---
+  document.getElementById('workoutForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const date = e.target.date.value;
+    const workout_type = e.target.workout_type.value.trim();
+    const duration = parseInt(e.target.duration.value, 10);
+    const category = e.target.category ? e.target.category.value.trim() : '';
+    const tags = e.target.tags ? e.target.tags.value.split(',').map(t=>t.trim()).filter(Boolean) : [];
+    const notes = e.target.notes ? e.target.notes.value.trim() : '';
+    let photoData = '';
+    if (e.target.photo && e.target.photo.files[0]) {
+      photoData = await toBase64(e.target.photo.files[0]);
+    }
+    if (!date || !workout_type || !duration || duration < 1) {
+      alert('Моля, попълнете всички полета правилно!');
+      return;
+    }
+    const workouts = getWorkouts();
+    const newWorkout = {
+      id: generateId(),
+      date,
+      workout_type,
+      duration_minutes: duration,
+      category,
+      tags,
+      notes,
+      photo: photoData,
+      calories: estimateCalories(workout_type, duration),
+      exercises: []
+    };
+    workouts.push(newWorkout);
+    saveWorkouts(workouts);
+    alert('Тренировката е добавена успешно!');
+    e.target.reset();
+    updateAll();
+  });
+
+  // --- Помощна функция за снимка ---
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // --- Експорт/импорт ---
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const data = localStorage.getItem('workouts');
+    const blob = new Blob([data], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'workouts.json';
+    a.click();
+  });
+  document.getElementById('importBtn').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const arr = JSON.parse(evt.target.result);
+        if (Array.isArray(arr)) {
+          localStorage.setItem('workouts', JSON.stringify(arr));
+          updateAll();
+          alert('Данните са импортирани успешно!');
+        }
+      } catch {}
+    };
+    reader.readAsText(file);
+  });
+
+  // --- Модифицирай loadWorkouts да показва новите полета и бутони за редакция ---
+  function loadWorkouts() {
+    const container = document.getElementById('workoutsListContainer');
+    const workouts = getWorkouts();
+    container.innerHTML = '';
+
+    if (workouts.length === 0) {
+      container.innerHTML = `<p style="text-align:center; font-style:italic; color:#7f8c8d; font-size:1.1rem;">Все още няма добавени тренировки.</p>`;
+      updateWorkoutSelect();
+      return;
+    }
+
+    workouts.forEach(w => {
+      const card = document.createElement('article');
+      card.className = 'workout-card';
+
+      const header = document.createElement('div');
+      header.className = 'workout-header';
+
+      const title = document.createElement('div');
+      title.className = 'workout-title';
+      title.textContent = `${w.date} | ${w.workout_type}`;
+
+      const info = document.createElement('div');
+      info.className = 'workout-info';
+      info.innerHTML = `Продължителност: ${w.duration_minutes} мин<br>
+        Категория: ${w.category || '-'}<br>
+        Тагове: ${(w.tags||[]).join(', ') || '-'}<br>
+        Калории: ${w.calories || estimateCalories(w.workout_type, w.duration_minutes)} kcal`;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-edit';
+      editBtn.textContent = 'Редактирай';
+      editBtn.title = 'Редактирай тази тренировка';
+      editBtn.style.background = '#2980b9';
+      editBtn.style.marginRight = '8px';
+      editBtn.style.color = 'white';
+      editBtn.style.borderRadius = '10px';
+      editBtn.addEventListener('click', () => editWorkout(w.id));
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-delete';
+      delBtn.textContent = 'Изтрий тренировка';
+      delBtn.title = 'Изтрий тази тренировка';
+      delBtn.addEventListener('click', () => {
+        if(confirm('Сигурни ли сте, че искате да изтриете тази тренировка?')) {
+          deleteWorkout(w.id);
+        }
+      });
+
+      header.append(title, info, editBtn, delBtn);
+      card.appendChild(header);
+
+      // Бележки
+      if (w.notes) {
+        const notesDiv = document.createElement('div');
+        notesDiv.style.fontStyle = 'italic';
+        notesDiv.style.marginBottom = '0.5rem';
+        notesDiv.textContent = 'Бележки: ' + w.notes;
+        card.appendChild(notesDiv);
+      }
+      // Снимка
+      if (w.photo) {
+        const img = document.createElement('img');
+        img.src = w.photo;
+        img.alt = 'Снимка към тренировка';
+        img.style.maxWidth = '120px';
+        img.style.display = 'block';
+        img.style.marginBottom = '0.5rem';
+        card.appendChild(img);
+      }
+
+      // Упражнения
+      const exercisesList = document.createElement('ul');
+      exercisesList.className = 'exercises-list';
+
+      if (!w.exercises || w.exercises.length === 0) {
+        const noEx = document.createElement('li');
+        noEx.style.fontStyle = 'italic';
+        noEx.style.color = '#95a5a6';
+        noEx.textContent = 'Няма добавени упражнения.';
+        exercisesList.appendChild(noEx);
+      } else {
+        w.exercises.forEach(ex => {
+          const li = document.createElement('li');
+          li.textContent = `${ex.name} — ${ex.reps} повторения x ${ex.sets} серии`;
+
+          const editExBtn = document.createElement('button');
+          editExBtn.className = 'btn-edit-ex';
+          editExBtn.title = 'Редактирай упражнение';
+          editExBtn.textContent = '✎';
+          editExBtn.style.background = '#16a085';
+          editExBtn.style.color = 'white';
+          editExBtn.style.marginRight = '6px';
+          editExBtn.style.borderRadius = '7px';
+          editExBtn.addEventListener('click', () => editExercise(w.id, ex.id));
+
+          const delExBtn = document.createElement('button');
+          delExBtn.className = 'btn-delete-ex';
+          delExBtn.title = 'Изтрий упражнение';
+          delExBtn.textContent = '✖';
+          delExBtn.addEventListener('click', () => {
+            if(confirm('Сигурни ли сте, че искате да изтриете това упражнение?')) {
+              deleteExercise(w.id, ex.id);
+            }
+          });
+
+          li.appendChild(editExBtn);
+          li.appendChild(delExBtn);
+          exercisesList.appendChild(li);
+        });
+      }
+      card.appendChild(exercisesList);
+
+      container.appendChild(card);
+    });
+
+    updateWorkoutSelect();
+  }
+
+  // --- Планиране на тренировки (basic) ---
+  // Добави в HTML: <button id="planBtn">Планирай тренировка</button>
+  document.getElementById('planBtn').addEventListener('click', () => {
+    const date = prompt('Въведи дата за планирана тренировка (YYYY-MM-DD):');
+    if (!date) return;
+    const type = prompt('Вид тренировка:');
+    if (!type) return;
+    const duration = prompt('Продължителност (мин):');
+    if (!duration) return;
+    const workouts = getWorkouts();
+    workouts.push({
+      id: generateId(),
+      date,
+      workout_type: type,
+      duration_minutes: parseInt(duration,10),
+      planned: true,
+      exercises: []
+    });
+    saveWorkouts(workouts);
+    updateAll();
+    alert('Планираната тренировка е добавена!');
+  });
+
+  // --- Напомняния (basic alert) ---
+  setInterval(() => {
+    const workouts = getWorkouts();
+    const today = new Date().toISOString().slice(0,10);
+    workouts.forEach(w => {
+      if (w.planned && w.date === today && !w.notified) {
+        alert('Днес имате планирана тренировка: ' + w.workout_type);
+        w.notified = true;
+        saveWorkouts(workouts);
+      }
+    });
+  }, 60000);
+
+  // --- Инициализация ---
+  updateAll();
+
+  // --- Графики и диаграми (Chart.js) ---
+  // Добави в HTML: <canvas id="progressChart" style="max-width:600px;margin:2rem auto;display:block;"></canvas>
+  // Вмъкни канваса преди <section id="workoutsListContainer">
+  (function insertChartCanvas() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('progressChart')) {
+      const canvas = document.createElement('canvas');
+      canvas.id = 'progressChart';
+      canvas.style.maxWidth = '600px';
+      canvas.style.margin = '2rem auto';
+      canvas.style.display = 'block';
+      main.insertBefore(canvas, document.getElementById('workoutsListContainer'));
+    }
+  })();
+  // Зареди Chart.js
+  if (!window.Chart) {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    script.onload = drawProgressChart;
+    document.head.appendChild(script);
+  } else {
+    drawProgressChart();
+  }
+  function drawProgressChart() {
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    const workouts = getWorkouts().filter(w => !w.planned);
+    // Групирай по дата, сумираj минути и повторения
+    const byDate = {};
+    workouts.forEach(w => {
+      if (!byDate[w.date]) byDate[w.date] = {minutes:0, reps:0};
+      byDate[w.date].minutes += w.duration_minutes;
+      if (w.exercises) w.exercises.forEach(ex => byDate[w.date].reps += (ex.reps*ex.sets));
+    });
+    const labels = Object.keys(byDate).sort();
+    const minutes = labels.map(d => byDate[d].minutes);
+    const reps = labels.map(d => byDate[d].reps);
+    if (window.progressChart) window.progressChart.destroy();
+    window.progressChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {label:'Минутна издържливост', data:minutes, borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,0.1)', yAxisID:'y'},
+          {label:'Общо повторения', data:reps, borderColor:'#e67e22', backgroundColor:'rgba(230,126,34,0.1)', yAxisID:'y1'}
+        ]
+      },
+      options: {
+        responsive:true,
+        plugins:{legend:{position:'top'}},
+        scales:{
+          y:{type:'linear', position:'left', title:{display:true,text:'Минути'}},
+          y1:{type:'linear', position:'right', title:{display:true,text:'Повторения'}, grid:{drawOnChartArea:false}}
+        }
+      }
+    });
+  }
+  // Обнови графиката при промяна
+  const origUpdateAll = updateAll;
+  window.updateAll = function() {
+    origUpdateAll();
+    if (window.Chart) drawProgressChart();
+  };
+
+  // --- Планове и програми ---
+  // Добави в HTML: <button id="planProgramBtn">Създай програма</button> <select id="programSelect"></select>
+  (function insertProgramUI() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('planProgramBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'planProgramBtn';
+      btn.textContent = 'Създай програма';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+    if (!document.getElementById('programSelect')) {
+      const sel = document.createElement('select');
+      sel.id = 'programSelect';
+      sel.style.margin = '1rem 0.5rem 1rem 0';
+      sel.innerHTML = '<option value="">-- Избери програма --</option>';
+      main.insertBefore(sel, document.querySelector('.flex'));
+    }
+  })();
+  function getPrograms() {
+    return JSON.parse(localStorage.getItem('programs')||'[]');
+  }
+  function savePrograms(arr) {
+    localStorage.setItem('programs', JSON.stringify(arr));
+  }
+  function updateProgramSelect() {
+    const sel = document.getElementById('programSelect');
+    const arr = getPrograms();
+    sel.innerHTML = '<option value="">-- Избери програма --</option>';
+    arr.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+  }
+  document.getElementById('planProgramBtn').onclick = function() {
+    const name = prompt('Име на програмата:');
+    if (!name) return;
+    const days = prompt('Брой тренировки в програмата:');
+    if (!days || isNaN(days)) return;
+    const workouts = [];
+    for (let i=1;i<=days;i++) {
+      const type = prompt(`Вид тренировка за ден ${i}:`);
+      const duration = prompt(`Продължителност (мин) за ден ${i}:`);
+      workouts.push({id:generateId(), workout_type:type, duration_minutes:parseInt(duration,10), exercises:[]});
+    }
+    const arr = getPrograms();
+    arr.push({id:generateId(), name, workouts});
+    savePrograms(arr);
+    updateProgramSelect();
+    alert('Програмата е създадена!');
+  };
+  document.getElementById('programSelect').onchange = function() {
+    const id = this.value;
+    if (!id) return;
+    const prog = getPrograms().find(p=>p.id==id);
+    if (!prog) return;
+    if (confirm('Да добавя всички тренировки от тази програма към календара?')) {
+      const workouts = getWorkouts();
+      const today = new Date();
+      prog.workouts.forEach((w,i) => {
+        const d = new Date(today);
+        d.setDate(today.getDate()+i);
+        workouts.push({...w, id:generateId(), date:d.toISOString().slice(0,10), planned:true});
+      });
+      saveWorkouts(workouts);
+      updateAll();
+      alert('Тренировките от програмата са добавени!');
+    }
+  };
+  updateProgramSelect();
+
+  // --- Таймер за почивка ---
+  // Добави в HTML: <button id="restTimerBtn">Таймер за почивка</button> <span id="restTimerDisplay"></span>
+  (function insertRestTimerUI() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('restTimerBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'restTimerBtn';
+      btn.textContent = 'Таймер за почивка';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+      const span = document.createElement('span');
+      span.id = 'restTimerDisplay';
+      span.style.marginLeft = '1rem';
+      main.insertBefore(span, document.querySelector('.flex'));
+    }
+  })();
+  let restTimer = null, restTimeLeft = 0;
+  document.getElementById('restTimerBtn').onclick = function() {
+    if (restTimer) {
+      clearInterval(restTimer);
+      restTimer = null;
+      document.getElementById('restTimerDisplay').textContent = '';
+      return;
+    }
+    let min = prompt('Минути за почивка:', '1');
+    if (!min || isNaN(min)) return;
+    restTimeLeft = parseInt(min,10)*60;
+    document.getElementById('restTimerDisplay').textContent = formatRestTime(restTimeLeft);
+    restTimer = setInterval(()=>{
+      restTimeLeft--;
+      document.getElementById('restTimerDisplay').textContent = formatRestTime(restTimeLeft);
+      if (restTimeLeft<=0) {
+        clearInterval(restTimer);
+        restTimer = null;
+        document.getElementById('restTimerDisplay').textContent = '';
+        // Звук
+        const audio = new Audio('https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa4c8b.mp3');
+        audio.play();
+        alert('Времето за почивка изтече!');
+      }
+    },1000);
+  };
+  function formatRestTime(sec) {
+    const m = Math.floor(sec/60), s = sec%60;
+    return `${m}:${s.toString().padStart(2,'0')}`;
+  }
+
+  // --- Интеграция с фитнес уреди и приложения (импорт на JSON) ---
+  // Добави в HTML: <input type="file" id="deviceImport" accept=".json" style="display:none;" /> <button id="deviceImportBtn">Импортирай от устройство</button>
+  (function insertDeviceImportUI() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('deviceImportBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'deviceImportBtn';
+      btn.textContent = 'Импортирай от устройство';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.id = 'deviceImport';
+      inp.accept = '.json';
+      inp.style.display = 'none';
+      main.insertBefore(inp, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('deviceImportBtn').onclick = function() {
+    document.getElementById('deviceImport').click();
+  };
+  document.getElementById('deviceImport').onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        // Очаква се JSON с масив от тренировки
+        const arr = JSON.parse(evt.target.result);
+        if (Array.isArray(arr)) {
+          const workouts = getWorkouts();
+          arr.forEach(w => workouts.push({...w, id:generateId()}));
+          saveWorkouts(workouts);
+          updateAll();
+          alert('Данните от устройството са импортирани!');
+        }
+      } catch {}
+    };
+    reader.readAsText(file);
+  };
+
+  // --- Известия и напомняния (Notification API) ---
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission();
+  }
+  function notifyUser(msg) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(msg);
+    }
+  }
+  setInterval(() => {
+    const workouts = getWorkouts();
+    const today = new Date().toISOString().slice(0,10);
+    workouts.forEach(w => {
+      if (w.planned && w.date === today && !w.notified) {
+        notifyUser('Днес имате планирана тренировка: ' + w.workout_type);
+        w.notified = true;
+        saveWorkouts(workouts);
+      }
+    });
+  }, 60000);
+
+  // --- Социални функции (споделяне) ---
+  // Добави в HTML: <button id="shareBtn">Сподели резултат</button>
+  (function insertShareBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('shareBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'shareBtn';
+      btn.textContent = 'Сподели резултат';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('shareBtn').onclick = function() {
+    const workouts = getWorkouts();
+    const text = 'Моите тренировки:\n' + workouts.map(w=>`${w.date}: ${w.workout_type} (${w.duration_minutes} мин)`).join('\n');
+    if (navigator.share) {
+      navigator.share({title:'Моите тренировки', text});
+    } else {
+      prompt('Копирай и сподели:', text);
+    }
+  };
+
+  // --- Лог за тегло и мерки ---
+  // Добави в HTML: <button id="weightLogBtn">Добави тегло/мерки</button>
+  (function insertWeightLogBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('weightLogBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'weightLogBtn';
+      btn.textContent = 'Добави тегло/мерки';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  function getWeightLog() {
+    return JSON.parse(localStorage.getItem('weightLog')||'[]');
+  }
+  function saveWeightLog(arr) {
+    localStorage.setItem('weightLog', JSON.stringify(arr));
+  }
+  document.getElementById('weightLogBtn').onclick = function() {
+    const date = prompt('Дата (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+    if (!date) return;
+    const weight = prompt('Тегло (кг):');
+    const waist = prompt('Обиколка талия (см):');
+    const fat = prompt('Процент мазнини (%):');
+    const arr = getWeightLog();
+    arr.push({date, weight, waist, fat});
+    saveWeightLog(arr);
+    alert('Данните са записани!');
+  };
+
+  // --- Автоматични препоръки (basic) ---
+  // Добави в HTML: <button id="suggestBtn">Препоръчай упражнение</button>
+  (function insertSuggestBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('suggestBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'suggestBtn';
+      btn.textContent = 'Препоръчай упражнение';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('suggestBtn').onclick = function() {
+    const workouts = getWorkouts();
+    const freq = {};
+    workouts.forEach(w => (w.exercises||[]).forEach(ex => freq[ex.name]=(freq[ex.name]||0)+1));
+    const all = ['Клекове','Лицеви опори','Бягане','Мъртва тяга','Планк','Коремни преси','Бърпита','Колоездене','Йога'];
+    const least = all.filter(n=>!freq[n]).concat(Object.entries(freq).sort((a,b)=>a[1]-b[1]).map(e=>e[0]));
+    alert('Опитай упражнение: ' + (least[0]||'Клекове'));
+  };
+
+  // --- Ранкинг и постижения (basic) ---
+  // Добави в HTML: <button id="achievementsBtn">Постижения</button>
+  (function insertAchievementsBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('achievementsBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'achievementsBtn';
+      btn.textContent = 'Постижения';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('achievementsBtn').onclick = function() {
+    const workouts = getWorkouts();
+    const total = workouts.length;
+    const maxDur = Math.max(...workouts.map(w=>w.duration_minutes),0);
+    const msg = [
+      total>=10 ? '🏅 10 тренировки!' : '',
+      maxDur>=120 ? '🏆 2 часа тренировка!' : '',
+      workouts.some(w=>w.exercises && w.exercises.length>=5) ? '🥇 5+ упражнения в тренировка!' : ''
+    ].filter(Boolean).join('\n') || 'Все още няма постижения.';
+    alert(msg);
+  };
+
+  // --- Гласови команди (Web Speech API, basic) ---
+  // Добави в HTML: <button id="voiceBtn">Гласово въвеждане</button>
+  (function insertVoiceBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('voiceBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'voiceBtn';
+      btn.textContent = 'Гласово въвеждане';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('voiceBtn').onclick = function() {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('Гласовото въвеждане не се поддържа.');
+      return;
+    }
+    const rec = new webkitSpeechRecognition();
+    rec.lang = 'bg-BG';
+    rec.onresult = function(e) {
+      const txt = e.results[0][0].transcript;
+      // Пример: "Добави тренировка бягане 30 минути"
+      if (/добави тренировка/i.test(txt)) {
+        const m = txt.match(/тренировка\s+(\w+)\s+(\d+)\s*мин/i);
+        if (m) {
+          const workouts = getWorkouts();
+          workouts.push({id:generateId(), date:new Date().toISOString().slice(0,10), workout_type:m[1], duration_minutes:parseInt(m[2],10), exercises:[]});
+          saveWorkouts(workouts);
+          updateAll();
+          alert('Тренировката е добавена чрез глас!');
+        }
+      }
+    };
+    rec.start();
+  };
+
+  // --- Избор на език и локализация (basic) ---
+  // Добави в HTML: <select id="langSelect"><option value="bg">Български</option><option value="en">English</option></select>
+  (function insertLangSelect() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('langSelect')) {
+      const sel = document.createElement('select');
+      sel.id = 'langSelect';
+      sel.innerHTML = '<option value="bg">Български</option><option value="en">English</option>';
+      sel.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(sel, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('langSelect').onchange = function() {
+    localStorage.setItem('lang', this.value);
+    location.reload();
+  };
+  // При зареждане, ако има език, смени
+  (function setLang() {
+    const lang = localStorage.getItem('lang');
+    if (lang && lang !== 'bg') {
+      document.documentElement.lang = lang;
+      // Примерен превод само на заглавието
+      document.querySelector('nav').textContent = lang==='en'?'Fitness Tracker':'Fitness Tracker';
+      document.querySelector('h1').textContent = lang==='en'?'Fitness Tracker':'Fitness Tracker';
+    }
+  })();
+
+  // --- Автоматично резервно копие (download) ---
+  setInterval(() => {
+    const data = localStorage.getItem('workouts');
+    if (data) {
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      localStorage.setItem('workouts_backup_url', url);
+    }
+  }, 5*60*1000);
+
+  // --- Поддръжка на различни видове упражнения (параметри по категория) ---
+  // При добавяне на упражнение, ако категорията е "кардио", "сила" и т.н., може да се добавят специфични полета.
+  // --- Следене на сън ---
+  // Добави в HTML: <button id="sleepLogBtn">Добави сън</button>
+  (function insertSleepLogBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('sleepLogBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'sleepLogBtn';
+      btn.textContent = 'Добави сън';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  function getSleepLog() {
+    return JSON.parse(localStorage.getItem('sleepLog')||'[]');
+  }
+  function saveSleepLog(arr) {
+    localStorage.setItem('sleepLog', JSON.stringify(arr));
+  }
+  document.getElementById('sleepLogBtn').onclick = function() {
+    const date = prompt('Дата (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+    if (!date) return;
+    const hours = prompt('Часове сън:');
+    const quality = prompt('Качество (1-10):');
+    const arr = getSleepLog();
+    arr.push({date, hours:parseFloat(hours), quality:parseInt(quality,10)});
+    saveSleepLog(arr);
+    alert('Данните за съня са записани!');
+  };
+
+  // --- Интерактивна карта за outdoor упражнения (бягане и др.) ---
+  // Добави в HTML: <div id="mapContainer" style="width:100%;height:300px;max-width:600px;margin:2rem auto;display:none;"></div>
+  (function insertMapContainer() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('mapContainer')) {
+      const div = document.createElement('div');
+      div.id = 'mapContainer';
+      div.style.width = '100%';
+      div.style.height = '300px';
+      div.style.maxWidth = '600px';
+      div.style.margin = '2rem auto';
+      div.style.display = 'none';
+      main.insertBefore(div, document.getElementById('workoutsListContainer'));
+    }
+  })();
+  // Показвай карта, ако има GPS данни към тренировка (примерно поле w.route = [{lat, lng}, ...])
+  function showMapForWorkout(route) {
+    if (!window.L) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet/dist/leaflet.js';
+      script.onload = () => showMapForWorkout(route);
+      document.head.appendChild(script);
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet/dist/leaflet.css';
+      document.head.appendChild(link);
+      return;
+    }
+    const mapDiv = document.getElementById('mapContainer');
+    mapDiv.style.display = 'block';
+    mapDiv.innerHTML = '';
+    const map = L.map(mapDiv).setView([route[0].lat, route[0].lng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    const latlngs = route.map(p=>[p.lat,p.lng]);
+    L.polyline(latlngs, {color:'blue'}).addTo(map);
+    map.fitBounds(latlngs);
+  }
+  // Добави бутон "Покажи маршрут" към тренировка с route
+  const origLoadWorkouts = loadWorkouts;
+  window.loadWorkouts = function() {
+    origLoadWorkouts();
+    const workouts = getWorkouts();
+    setTimeout(()=>{
+      document.querySelectorAll('.workout-card').forEach((card, idx) => {
+        const w = workouts[idx];
+        if (w && w.route && w.route.length) {
+          let btn = card.querySelector('.btn-show-route');
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.textContent = 'Покажи маршрут';
+            btn.className = 'btn-show-route';
+            btn.style.background = '#27ae60';
+            btn.style.color = 'white';
+            btn.style.marginLeft = '8px';
+            btn.onclick = ()=>showMapForWorkout(w.route);
+            card.querySelector('.workout-header').appendChild(btn);
+          }
+        }
+      });
+    }, 100);
+  };
+
+  // --- Видео или снимки към упражненията ---
+  // Добави поле във формата за упражнение:
+  // <label for="exercise_media">Снимка/Видео:</label>
+  // <input type="file" id="exercise_media" accept="image/*,video/*" />
+  // Модифицирай submit обработчика:
+  document.getElementById('exerciseForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const workoutId = parseInt(e.target.selectWorkout.value, 10);
+    const exercise_name = e.target.exercise_name.value.trim();
+    const reps = parseInt(e.target.reps.value, 10);
+    const sets = parseInt(e.target.sets.value, 10);
+    let media = '';
+    if (e.target.exercise_media && e.target.exercise_media.files[0]) {
+      media = await toBase64(e.target.exercise_media.files[0]);
+    }
+    if (!workoutId || !exercise_name || !reps || !sets || reps < 1 || sets < 1) {
+      alert('Моля, попълнете всички полета правилно!');
+      return;
+    }
+    const workouts = getWorkouts();
+    const workout = workouts.find(w => w.id === workoutId);
+    if (!workout) {
+      alert('Не е намерена тренировка с този избор!');
+      return;
+    }
+    const newExercise = {
+      id: generateId(),
+      name: exercise_name,
+      reps,
+      sets,
+      media
+    };
+    workout.exercises.push(newExercise);
+    saveWorkouts(workouts);
+    alert('Упражнението е добавено успешно!');
+    e.target.reset();
+    updateAll();
+  });
+  // Покажи медия към упражнение
+  const origLoadWorkouts2 = window.loadWorkouts;
+  window.loadWorkouts = function() {
+    origLoadWorkouts2();
+    const workouts = getWorkouts();
+    setTimeout(()=>{
+      document.querySelectorAll('.workout-card').forEach((card, idx) => {
+        const w = workouts[idx];
+        if (w && w.exercises) {
+          card.querySelectorAll('ul.exercises-list li').forEach((li, exIdx) => {
+            const ex = w.exercises[exIdx];
+            if (ex && ex.media) {
+              let mediaEl;
+              if (ex.media.startsWith('data:video')) {
+                mediaEl = document.createElement('video');
+                mediaEl.src = ex.media;
+                mediaEl.controls = true;
+                mediaEl.style.maxWidth = '100px';
+                mediaEl.style.display = 'block';
+              } else if (ex.media.startsWith('data:image')) {
+                mediaEl = document.createElement('img');
+                mediaEl.src = ex.media;
+                mediaEl.style.maxWidth = '100px';
+                mediaEl.style.display = 'block';
+              }
+              if (mediaEl) li.appendChild(mediaEl);
+            }
+          });
+        }
+      });
+    }, 200);
+  };
+
+  // --- История на постижения (лични рекорди) ---
+  // Запази най-добри резултати в localStorage
+  function getAchievementsHistory() {
+    return JSON.parse(localStorage.getItem('achievementsHistory')||'[]');
+  }
+  function saveAchievementsHistory(arr) {
+    localStorage.setItem('achievementsHistory', JSON.stringify(arr));
+  }
+  // При добавяне на упражнение, ако е нов рекорд, запиши
+  function updateAchievements(ex) {
+    const arr = getAchievementsHistory();
+    const prev = arr.find(a=>a.name===ex.name);
+    const total = ex.reps*ex.sets;
+    if (!prev || total > prev.total) {
+      const rec = {name:ex.name, total, date:new Date().toISOString().slice(0,10)};
+      if (prev) Object.assign(prev, rec);
+      else arr.push(rec);
+      saveAchievementsHistory(arr);
+    }
+  }
+  // Добави към exercise submit:
+  const origExerciseSubmit = document.getElementById('exerciseForm').onsubmit;
+  document.getElementById('exerciseForm').onsubmit = async function(e) {
+    if (origExerciseSubmit) await origExerciseSubmit(e);
+    // Последното упражнение
+    const workouts = getWorkouts();
+    const last = workouts[workouts.length-1];
+    if (last && last.exercises && last.exercises.length) {
+      updateAchievements(last.exercises[last.exercises.length-1]);
+    }
+  };
+  // Покажи историята на постиженията
+  (function insertAchievementsHistoryBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('achievementsHistoryBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'achievementsHistoryBtn';
+      btn.textContent = 'История на рекорди';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('achievementsHistoryBtn').onclick = function() {
+    const arr = getAchievementsHistory();
+    if (!arr.length) return alert('Все още няма рекорди.');
+    alert(arr.map(a=>`${a.name}: ${a.total} (${a.date})`).join('\n'));
+  };
+
+  // --- Персонализиране на интерфейса (цветове, шрифтове, подредба) ---
+  // Добави в HTML: <button id="customizeBtn">Персонализирай</button>
+  (function insertCustomizeBtn() {
+    const main = document.querySelector('main');
+    if (!document.getElementById('customizeBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'customizeBtn';
+      btn.textContent = 'Персонализирай';
+      btn.style.margin = '1rem 0.5rem 1rem 0';
+      main.insertBefore(btn, document.querySelector('.flex'));
+    }
+  })();
+  document.getElementById('customizeBtn').onclick = function() {
+    const color = prompt('Основен цвят (hex):', localStorage.getItem('mainColor')||'#74ebd5');
+    const font = prompt('Шрифт (CSS font-family):', localStorage.getItem('mainFont')||'Poppins, sans-serif');
+    if (color) {
+      document.body.style.setProperty('--main-color', color);
+      localStorage.setItem('mainColor', color);
+      document.body.style.background = `linear-gradient(135deg, ${color} 0%, #ACB6E5 100%)`;
+    }
+    if (font) {
+      document.body.style.fontFamily = font;
+      localStorage.setItem('mainFont', font);
+    }
+    alert('Интерфейсът е персонализиран!');
+  };
+  // При зареждане, приложи персонализацията
+  (function applyCustomization() {
+    const color = localStorage.getItem('mainColor');
+    const font = localStorage.getItem('mainFont');
+    if (color) document.body.style.background = `linear-gradient(135deg, ${color} 0%, #ACB6E5 100%)`;
+    if (font) document.body.style.fontFamily = font;
+  })();
+
+  // (Това е пример, за по-детайлна реализация ще трябва да се разшири формата и логиката.)
 </script>
 </body>
 </html>
