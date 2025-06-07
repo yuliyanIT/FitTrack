@@ -78,3 +78,27 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+/**
+ * Редактиране на упражнение
+ */
+app.put('/exercises/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, reps, sets, weight } = req.body;
+    await db('exercises')
+      .where({ id })
+      .update({ name, reps, sets, weight });
+    res.json({ message: 'Exercise updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Добавяне на колонка "weight" към exercises, ако не съществува
+db.schema.hasColumn('exercises', 'weight').then(exists => {
+  if (!exists) {
+    return db.schema.table('exercises', table => {
+      table.float('weight');
+    });
+  }
+});
